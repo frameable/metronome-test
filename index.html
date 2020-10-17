@@ -1,0 +1,116 @@
+<audio autoplay controls></audio>
+
+<div id="buttons">
+    <button onclick="start()" id="start">Start</button>
+    <button onclick="stop()" id="stop" disabled>Stop</button>
+</div>
+
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+<script>
+
+class Metronome {
+
+  constructor() {
+    window.AudioContext = window.AudioContext;
+    this.context = new AudioContext();
+    this.soundBuffer = null;
+  }
+
+  stream() {
+    this.peer = this.context.createMediaStreamDestination();
+    return this.peer.stream;
+  }
+
+  stop() {
+    this.peer = null;
+  }
+
+  bong() {
+    let effect = this.context.createBufferSource();
+    effect.buffer = this.soundBuffer;
+    if (this.peer) {
+      effect.connect(this.peer);
+      effect.start(0);
+    }
+  }
+
+  load(url) {
+    this.request = new XMLHttpRequest();
+    this.request.open('GET', url, true);
+    this.request.responseType = 'arraybuffer';
+    this.request.onload = () => {
+      this.context.decodeAudioData(this.request.response, buffer => {
+        this.soundBuffer = buffer;
+      });
+    };
+    this.request.send();
+  }
+
+}
+
+const audioElement = document.querySelector('audio');
+const startButton = document.querySelector('button#start');
+const stopButton = document.querySelector('button#stop');
+
+let pc1, pc2;
+
+const metronome = new Metronome;
+metronome.load('audio/Shamisen-C4.wav');
+
+function start() {
+  startStream();
+  startButton.disabled = true;
+  stopButton.disabled = false;
+}
+
+function stop() {
+  startButton.disabled = false;
+  stopButton.disabled = true;
+  metronome.stop();
+  pc1.close();
+  pc2.close();
+  pc1 = null;
+  pc2 = null;
+}
+
+function startStream() {
+  const stream = metronome.stream();
+  const servers = null;
+  pc1 = new RTCPeerConnection(servers);
+  pc1.onicecandidate = e => onIceCandidate(pc1, e);
+  pc2 = new RTCPeerConnection(servers);
+  pc2.onicecandidate = e => onIceCandidate(pc2, e);
+  pc2.ontrack = gotRemoteStream;
+  stream.getTracks().forEach(track => pc1.addTrack(track, stream));
+  pc1.createOffer().then(gotDescription1).catch(error => console.warn);
+}
+
+function gotDescription1(desc) {
+  pc1.setLocalDescription(desc);
+  pc2.setRemoteDescription(desc);
+  pc2.createAnswer()
+    .then(gotDescription2)
+    .catch(error => console.warn);
+}
+
+function gotDescription2(desc) {
+  pc2.setLocalDescription(desc);
+  pc1.setRemoteDescription(desc);
+}
+
+function gotRemoteStream(e) {
+  if (audioElement.srcObject !== e.streams[0]) {
+    audioElement.srcObject = e.streams[0];
+  }
+}
+
+function onIceCandidate(pc, event) {
+  (pc == pc1 ? pc2 : pc1)
+    .addIceCandidate(event.candidate)
+    .then();
+}
+
+setInterval(_ => metronome.bong(), 1000);
+
+</script>
