@@ -83,6 +83,9 @@ function startStream() {
   pc2.onicecandidate = e => onIceCandidate(pc2, e);
   pc2.ontrack = gotRemoteStream;
   stream.getTracks().forEach(track => pc1.addTrack(track, stream));
+  stream.getTracks().forEach(track => {
+    track.addEventListener('ended', () => console.log('Track ended', track.kind, track));
+  });
   pc1.createOffer().then(gotDescription1).catch(error => console.warn);
 }
 
