@@ -1,3 +1,4 @@
+
 <audio autoplay controls></audio>
 
 <div id="buttons">
@@ -37,7 +38,7 @@ class Metronome {
 
   load(url) {
     this.request = new XMLHttpRequest();
-    this.request.open('GET', url, true);
+    this.request.open('GET', url + "?w=" + Math.random().toString(36), true);
     this.request.responseType = 'arraybuffer';
     this.request.onload = () => {
       this.context.decodeAudioData(this.request.response, buffer => {
@@ -56,7 +57,7 @@ const stopButton = document.querySelector('button#stop');
 let pc1, pc2;
 
 const metronome = new Metronome;
-metronome.load('tick.wav');
+metronome.load('tick.wav?c=' + Math.random().toString(36).substring(7));
 
 function start() {
   startStream();
@@ -74,6 +75,8 @@ function stop() {
   pc2 = null;
 }
 
+
+
 function startStream() {
   const stream = metronome.stream();
   const servers = null;
@@ -83,12 +86,30 @@ function startStream() {
   pc2.onicecandidate = e => onIceCandidate(pc2, e);
   pc2.ontrack = gotRemoteStream;
   stream.getTracks().forEach(track => pc1.addTrack(track, stream));
-  stream.getTracks().forEach(track => {
-    track.addEventListener('ended', () => console.log('Track ended', track.kind, track));
-  });
   pc1.createOffer().then(gotDescription1).catch(error => console.warn);
 }
 
+const channel = new BroadcastChannel('tabby');
+channel.onmessage = async function(e) {
+  const message = e.data;
+  if (message.tabclose) {
+    for (let x = 0; x < 5; x++) {
+      console.log("RESETTING!!! TABCLOSED");
+      audioElement.pause()
+      audioElement.srcObject = audioElement.srcObject
+      await audioElement.play()
+    }
+  }
+};
+window.addEventListener('unload', function(event) {
+  channel.postMessage({ tabclose: 'value' });
+  metronome.stop();
+  pc1.close();
+  pc2.close();
+  pc1 = null;
+  pc2 = null;
+  console.log('I am the 2nd one.');
+});
 function gotDescription1(desc) {
   pc1.setLocalDescription(desc);
   pc2.setRemoteDescription(desc);
