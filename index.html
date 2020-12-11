@@ -75,8 +75,6 @@ function stop() {
   pc2 = null;
 }
 
-
-
 function startStream() {
   const stream = metronome.stream();
   const servers = null;
@@ -91,6 +89,8 @@ function startStream() {
 
 const channel = new BroadcastChannel('tabby');
 channel.onmessage = async function(e) {
+  //console.log("SLEEPING", location.search.substring(1));
+  //await new Promise(r => setTimeout(r, location.search.substring(1) * 50));
   const message = e.data;
   if (message.tabclose) {
     for (let x = 0; x < 5; x++) {
