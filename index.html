@@ -10,6 +10,8 @@
 
 <script>
 
+const tabId = Math.random().toString(36).substr(2);
+
 class Metronome {
 
   constructor() {
@@ -87,22 +89,43 @@ function startStream() {
   pc1.createOffer().then(gotDescription1).catch(error => console.warn);
 }
 
+const tabStates = {};
+
 const channel = new BroadcastChannel('tabby');
 channel.onmessage = async function(e) {
-  //console.log("SLEEPING", location.search.substring(1));
-  //await new Promise(r => setTimeout(r, location.search.substring(1) * 50));
   const message = e.data;
+  if (message.load) {
+    tabStates[message.load] = 'loaded';
+  }
   if (message.tabclose) {
-    for (let x = 0; x < 5; x++) {
-      console.log("RESETTING!!! TABCLOSED");
-      audioElement.pause()
-      audioElement.srcObject = audioElement.srcObject
-      await audioElement.play()
-    }
+    delete tabStates[message.tabclose];
+    // notify other tabs that we've stopped our audio track
+    const clonedStream = audioElement.srcObject.clone();
+    audioElement.srcObject.getTracks().forEach(t => t.stop());
+    channel.postMessage({ stoppedAudio: tabId });
+    const resumeIv = setInterval(async _ => {
+      // wait for all open tabs to be stopped
+      if (Object.values(tabStates).find(state => state !== 'stopped')) {
+        return;
+      }
+
+      clearInterval(resumeIv);
+
+      // resume audio
+      audioElement.srcObject = clonedStream;
+      await audioElement.play();
+
+      // broadcast our recovered state
+      channel.postMessage({ load: tabId });
+    }, 10);
+  }
+  if (message.stoppedAudio) {
+    tabStates[message.stoppedAudio] = 'stopped';
   }
 };
+
 window.addEventListener('unload', function(event) {
-  channel.postMessage({ tabclose: 'value' });
+  channel.postMessage({ tabclose: tabId });
   metronome.stop();
   pc1.close();
   pc2.close();
@@ -110,6 +133,11 @@ window.addEventListener('unload', function(event) {
   pc2 = null;
   console.log('I am the 2nd one.');
 });
+
+window.addEventListener('load', function(event) {
+  channel.postMessage({ load: tabId });
+});
+
 function gotDescription1(desc) {
   pc1.setLocalDescription(desc);
   pc2.setRemoteDescription(desc);
