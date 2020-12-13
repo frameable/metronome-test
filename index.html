@@ -6,7 +6,7 @@
     <button onclick="stop()" id="stop" disabled>Stop</button>
 </div>
 
-<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="/adapter-latest.js"></script>
 
 <script>
 
@@ -57,7 +57,8 @@ const stopButton = document.querySelector('button#stop');
 let pc1, pc2;
 
 const metronome = new Metronome;
-metronome.load('tick.wav?c=' + Math.random().toString(36).substring(7));
+const file = location.search.substring(1) || 'tick.wav';
+metronome.load(file);
 
 function start() {
   startStream();
@@ -87,29 +88,6 @@ function startStream() {
   pc1.createOffer().then(gotDescription1).catch(error => console.warn);
 }
 
-const channel = new BroadcastChannel('tabby');
-channel.onmessage = async function(e) {
-  //console.log("SLEEPING", location.search.substring(1));
-  //await new Promise(r => setTimeout(r, location.search.substring(1) * 50));
-  const message = e.data;
-  if (message.tabclose) {
-    for (let x = 0; x < 5; x++) {
-      console.log("RESETTING!!! TABCLOSED");
-      audioElement.pause()
-      audioElement.srcObject = audioElement.srcObject
-      await audioElement.play()
-    }
-  }
-};
-window.addEventListener('unload', function(event) {
-  channel.postMessage({ tabclose: 'value' });
-  metronome.stop();
-  pc1.close();
-  pc2.close();
-  pc1 = null;
-  pc2 = null;
-  console.log('I am the 2nd one.');
-});
 function gotDescription1(desc) {
   pc1.setLocalDescription(desc);
   pc2.setRemoteDescription(desc);
